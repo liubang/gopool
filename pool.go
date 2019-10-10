@@ -3,6 +3,7 @@ package gopool
 import (
 	"errors"
 	"io"
+	"runtime"
 	"sync"
 )
 
@@ -34,8 +35,7 @@ func NewPool(minConn, maxConn int, factory factory) (*Pool, error) {
 	}
 
 	if maxConn <= 0 {
-		// TODO use cpu number
-		maxConn = 4
+		maxConn = runtime.NumCPU()
 	}
 
 	p := &Pool{
