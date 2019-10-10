@@ -18,14 +18,7 @@ type Conn interface {
 
 type factory func() (Conn, error)
 
-type Pool interface {
-	Acquire() (Conn, error)
-	Release(Conn) error
-	Close(Conn) error
-	Shutdown() error
-}
-
-type CommonPool struct {
+type Pool struct {
 	sync.Mutex
 	pool      chan Conn
 	minConn   int
@@ -35,7 +28,7 @@ type CommonPool struct {
 	factory   factory
 }
 
-func NewCommonPool(minConn, maxConn int, factory factory) (*CommonPool, error) {
+func NewPool(minConn, maxConn int, factory factory) (*Pool, error) {
 	if maxConn < minConn {
 		return nil, ErrParameter
 	}
@@ -45,7 +38,7 @@ func NewCommonPool(minConn, maxConn int, factory factory) (*CommonPool, error) {
 		maxConn = 4
 	}
 
-	p := &CommonPool{
+	p := &Pool{
 		pool:    make(chan Conn, maxConn),
 		maxConn: maxConn,
 		closed:  false,
@@ -64,7 +57,7 @@ func NewCommonPool(minConn, maxConn int, factory factory) (*CommonPool, error) {
 	return p, nil
 }
 
-func (p *CommonPool) Acquire() (Conn, error) {
+func (p *Pool) Acquire() (Conn, error) {
 	if p.closed {
 		return nil, ErrState
 	}
@@ -103,7 +96,7 @@ TRY_RESOURCE:
 	}
 }
 
-func (p *CommonPool) Release(conn Conn) error {
+func (p *Pool) Release(conn Conn) error {
 	if p.closed {
 		return ErrState
 	}
@@ -112,7 +105,7 @@ func (p *CommonPool) Release(conn Conn) error {
 	return nil
 }
 
-func (p *CommonPool) Close(conn Conn) error {
+func (p *Pool) Close(conn Conn) error {
 	err := conn.Close()
 	if err != nil {
 		return err
@@ -123,7 +116,7 @@ func (p *CommonPool) Close(conn Conn) error {
 	return nil
 }
 
-func (p *CommonPool) Shutdown() error {
+func (p *Pool) Shutdown() error {
 	if p.closed {
 		return nil
 	}
