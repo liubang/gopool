@@ -22,7 +22,7 @@ func (tp *TcpConn) Alive() bool {
 
 func TestCommonPool(t *testing.T) {
 	pool, err := NewCommonPool(5, 10, func() (Conn, error) {
-		c, e := net.Dial("tcp", "127.0.0.1:3306")
+		c, e := net.Dial("tcp", "venux-dev:80")
 		if e != nil {
 			return nil, e
 		}
@@ -35,9 +35,10 @@ func TestCommonPool(t *testing.T) {
 		t.Error(err)
 	}
 
+	defer pool.Shutdown()
 	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
+	wg.Add(20)
+	for i := 0; i < 20; i++ {
 		go func(pool Pool, i int) {
 			c, e := pool.Acquire()
 			if e != nil {
@@ -45,7 +46,10 @@ func TestCommonPool(t *testing.T) {
 			}
 			fmt.Println(i, "do sth.")
 			time.Sleep(time.Second)
-			pool.Release(c)
+			e = pool.Release(c)
+			if e != nil {
+				t.Error(e)
+			}
 			fmt.Println(i, "done.")
 			wg.Done()
 		}(pool, i)

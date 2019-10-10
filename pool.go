@@ -69,17 +69,14 @@ func (p *CommonPool) Acquire() (Conn, error) {
 		return nil, ErrState
 	}
 
-TRY:
+TRY_RESOURCE:
 	select {
 	case conn := <-p.pool:
 		if conn.Alive() {
 			return conn, nil
 		} else {
-			conn.Close()
-			p.Lock()
-			p.connCount--
-			p.Unlock()
-			goto TRY
+			p.Close(conn)
+			goto TRY_RESOURCE
 		}
 	default:
 	}
@@ -91,11 +88,8 @@ TRY:
 		if conn.Alive() {
 			return conn, nil
 		} else {
-			conn.Close()
-			p.Lock()
-			p.connCount--
-			p.Unlock()
-			goto TRY
+			p.Close(conn)
+			goto TRY_RESOURCE
 		}
 	} else {
 		conn, err := p.factory()
