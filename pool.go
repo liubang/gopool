@@ -5,6 +5,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"time"
 )
 
 var (
@@ -14,22 +15,23 @@ var (
 
 type Conn interface {
 	io.Closer
-	Alive() bool
+	Ok(time.Duration) bool
 }
 
 type factory func() (Conn, error)
 
 type Pool struct {
 	sync.Mutex
-	pool      chan Conn
-	minConn   int
-	maxConn   int
-	connCount int
-	closed    bool
-	factory   factory
+	pool        chan Conn
+	minConn     int
+	maxConn     int
+	connCount   int
+	idleTimeout time.Duration
+	closed      bool
+	factory     factory
 }
 
-func NewPool(minConn, maxConn int, factory factory) (*Pool, error) {
+func NewPool(minConn, maxConn int, idleTimeout time.Duration, factory factory) (*Pool, error) {
 	if maxConn < minConn {
 		return nil, ErrParameter
 	}
@@ -39,10 +41,12 @@ func NewPool(minConn, maxConn int, factory factory) (*Pool, error) {
 	}
 
 	p := &Pool{
-		pool:    make(chan Conn, maxConn),
-		maxConn: maxConn,
-		closed:  false,
-		factory: factory,
+		pool:        make(chan Conn, maxConn),
+		minConn:     minConn,
+		maxConn:     maxConn,
+		idleTimeout: idleTimeout,
+		closed:      false,
+		factory:     factory,
 	}
 
 	for i := 0; i < minConn; i++ {
@@ -65,7 +69,7 @@ func (p *Pool) Acquire() (Conn, error) {
 TRY_RESOURCE:
 	select {
 	case conn := <-p.pool:
-		if conn.Alive() {
+		if conn.Ok(p.idleTimeout) {
 			return conn, nil
 		} else {
 			p.Close(conn)
@@ -78,7 +82,7 @@ TRY_RESOURCE:
 	if p.connCount >= p.maxConn {
 		p.Unlock()
 		conn := <-p.pool
-		if conn.Alive() {
+		if conn.Ok(p.idleTimeout) {
 			return conn, nil
 		} else {
 			p.Close(conn)

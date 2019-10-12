@@ -10,24 +10,26 @@ import (
 
 type TcpConn struct {
 	conn net.Conn
+	t    time.Time
 }
 
 func (tp *TcpConn) Close() error {
 	return tp.conn.Close()
 }
 
-func (tp *TcpConn) Alive() bool {
-	return true
+func (tp *TcpConn) Ok(idleTimeout time.Duration) bool {
+	return tp.t.Add(idleTimeout).After(time.Now())
 }
 
 func TestCommonPool(t *testing.T) {
-	pool, err := NewPool(5, 10, func() (Conn, error) {
+	pool, err := NewPool(5, 10, 3*time.Second, func() (Conn, error) {
 		c, e := net.Dial("tcp", "venux-dev:80")
 		if e != nil {
 			return nil, e
 		}
 		return &TcpConn{
 			conn: c,
+			t:    time.Now(),
 		}, nil
 	})
 
@@ -45,7 +47,7 @@ func TestCommonPool(t *testing.T) {
 				t.Error(e)
 			}
 			fmt.Println(i, "do sth.")
-			time.Sleep(time.Second)
+			time.Sleep(time.Second * 4)
 			e = pool.Release(c)
 			if e != nil {
 				t.Error(e)
