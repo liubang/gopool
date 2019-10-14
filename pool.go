@@ -22,34 +22,71 @@ type factory func() (Conn, error)
 
 type Pool struct {
 	sync.Mutex
-	pool        chan Conn
-	minConn     int
-	maxConn     int
-	connCount   int
-	idleTimeout time.Duration
-	closed      bool
-	factory     factory
+	pool      chan Conn
+	opts      PoolOptions
+	connCount int
+	closed    bool
+	factory   factory
 }
 
-func NewPool(minConn, maxConn int, idleTimeout time.Duration, factory factory) (*Pool, error) {
-	if maxConn < minConn {
-		return nil, ErrParameter
+type PoolOptions struct {
+	MinConn     int
+	MaxConn     int
+	IdleTimeout time.Duration
+}
+
+type PoolOption func(*PoolOptions)
+
+func newPoolOptions(opt ...PoolOption) PoolOptions {
+	opts := PoolOptions{}
+
+	for _, o := range opt {
+		o(&opts)
 	}
 
-	if maxConn <= 0 {
-		maxConn = runtime.NumCPU()
+	if opts.MaxConn <= 0 {
+		opts.MaxConn = runtime.NumCPU()
 	}
 
+	if opts.MinConn > opts.MaxConn {
+		opts.MinConn = opts.MaxConn
+	}
+
+	if opts.IdleTimeout <= 0 {
+		opts.IdleTimeout = 0
+	}
+
+	return opts
+}
+
+func PoolMinConn(n int) PoolOption {
+	return func(o *PoolOptions) {
+		o.MinConn = n
+	}
+}
+
+func PoolMaxConn(n int) PoolOption {
+	return func(o *PoolOptions) {
+		o.MaxConn = n
+	}
+}
+
+func PoolIdleTimeout(n time.Duration) PoolOption {
+	return func(o *PoolOptions) {
+		o.IdleTimeout = n
+	}
+}
+
+func NewPool(factory factory, opt ...PoolOption) (*Pool, error) {
+	opts := newPoolOptions(opt...)
 	p := &Pool{
-		pool:        make(chan Conn, maxConn),
-		minConn:     minConn,
-		maxConn:     maxConn,
-		idleTimeout: idleTimeout,
-		closed:      false,
-		factory:     factory,
+		pool:    make(chan Conn, opts.MaxConn),
+		opts:    opts,
+		closed:  false,
+		factory: factory,
 	}
 
-	for i := 0; i < minConn; i++ {
+	for i := 0; i < opts.MinConn; i++ {
 		conn, err := factory()
 		if err != nil {
 			continue
@@ -69,7 +106,7 @@ func (p *Pool) Acquire() (Conn, error) {
 TRY_RESOURCE:
 	select {
 	case conn := <-p.pool:
-		if conn.Ok(p.idleTimeout) {
+		if conn.Ok(p.opts.IdleTimeout) {
 			return conn, nil
 		} else {
 			p.Close(conn)
@@ -79,10 +116,10 @@ TRY_RESOURCE:
 	}
 
 	p.Lock()
-	if p.connCount >= p.maxConn {
+	if p.connCount >= p.opts.MaxConn {
 		p.Unlock()
 		conn := <-p.pool
-		if conn.Ok(p.idleTimeout) {
+		if conn.Ok(p.opts.IdleTimeout) {
 			return conn, nil
 		} else {
 			p.Close(conn)

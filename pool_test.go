@@ -22,7 +22,8 @@ func (tp *TcpConn) Ok(idleTimeout time.Duration) bool {
 }
 
 func TestCommonPool(t *testing.T) {
-	pool, err := NewPool(5, 10, 3*time.Second, func() (Conn, error) {
+	factory := func() (Conn, error) {
+
 		c, e := net.Dial("tcp", "venux-dev:80")
 		if e != nil {
 			return nil, e
@@ -31,8 +32,8 @@ func TestCommonPool(t *testing.T) {
 			conn: c,
 			t:    time.Now(),
 		}, nil
-	})
-
+	}
+	pool, err := NewPool(factory, PoolMinConn(5), PoolMaxConn(10), PoolIdleTimeout(3*time.Second))
 	if err != nil {
 		t.Error(err)
 	}
