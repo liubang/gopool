@@ -1,11 +1,10 @@
-package gopool
+# gopool
 
-import (
-	"net"
-	"testing"
-	"time"
-)
+This is a simple golang tcp connection pool.
 
+## example
+
+```go
 type (
 	CloseTcpConn func(client interface{}) error
 	TcpIsOpen    func(client interface{}) bool
@@ -41,7 +40,7 @@ func (tc *testConn) ForceClose() bool {
 	return false
 }
 
-func f() (Conn, error) {
+func factory() (Conn, error) {
 	socket, _ := net.Dial("tcp", "weibo.com:80")
 	return &testConn{
 		conn: socket,
@@ -55,10 +54,24 @@ func f() (Conn, error) {
 }
 
 func BenchmarkAquire(b *testing.B) {
-	pool := NewPool(f, PoolMaxIdle(30), PoolMaxActive(30))
+	pool := NewPool(factory, PoolMaxIdle(30), PoolMaxActive(30))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		conn, _ := pool.Aquire()
 		conn.Close()
 	}
 }
+
+```
+
+## benchmark
+
+```
+liubang@venux-dev:~/workspace/go/gopool$ go test -bench=. -run=none
+goos: linux
+goarch: amd64
+pkg: github.com/iliubang/gopool
+BenchmarkAquire-4   	 4380476	       258 ns/op
+PASS
+ok  	github.com/iliubang/gopool	1.424s
+```
