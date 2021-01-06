@@ -1,3 +1,3 @@
-module github.com/iliubang/gopool
+module github.com/liubang/gopool
 
 go 1.13

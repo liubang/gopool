@@ -70,8 +70,8 @@ func BenchmarkAquire(b *testing.B) {
 liubang@venux-dev:~/workspace/go/gopool$ go test -bench=. -run=none
 goos: linux
 goarch: amd64
-pkg: github.com/iliubang/gopool
+pkg: github.com/liubang/gopool
 BenchmarkAquire-4   	 4380476	       258 ns/op
 PASS
-ok  	github.com/iliubang/gopool	1.424s
+ok  	github.com/liubang/gopool	1.424s
 ```
